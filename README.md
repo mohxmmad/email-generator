@@ -1,18 +1,19 @@
 # Email Generator (Django + React)
 
-A full-stack email generator web app:
-- **Backend:** Django + Django REST Framework
-- **Frontend:** React + Vite
-- **AI generation:** Groq model (optional) with built-in local fallback
-- **Deployment targets:** Render (backend) and Vercel (frontend)
+Full-stack email generator with two AI paths:
+- **Groq LLM** (when `GROQ_API_KEY` is set)
+- **Local self-trained fallback model** (works with no API keys)
+
+Backend: Django + DRF  
+Frontend: React + Vite  
+Deploy: Render (backend) + Vercel (frontend)
 
 ## Features
 
-- Rich email brief form (sender, recipient, purpose, key points, tone, length, language)
-- AI-generated **subject** and **body**
-- Copy subject/body/full email to clipboard
-- Clean responsive UI
-- API-first architecture for easy future extension
+- Generate email **subject** and **body** from structured brief inputs
+- Tone + length controls
+- Copy subject/body/full email
+- Local fallback model trained from in-repo corpus, with retraining command for Kaggle/public datasets
 
 ## Project Structure
 
@@ -21,6 +22,9 @@ A full-stack email generator web app:
 ├── backend
 │   ├── email_generator
 │   ├── emails
+│   │   ├── data/seed_email_corpus.jsonl
+│   │   ├── local_ai.py
+│   │   └── management/commands/train_email_fallback_model.py
 │   ├── manage.py
 │   └── requirements.txt
 ├── frontend
@@ -32,7 +36,7 @@ A full-stack email generator web app:
 
 ## Local Development
 
-### 1) Backend (Django)
+### Backend
 
 ```bash
 cd backend
@@ -44,9 +48,7 @@ python manage.py migrate
 python manage.py runserver
 ```
 
-Backend runs on `http://localhost:8000`.
-
-### 2) Frontend (React)
+### Frontend
 
 ```bash
 cd frontend
@@ -55,65 +57,60 @@ cp .env.example .env
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`.
-
 ## API
 
-`POST /api/generate-email/`
+`POST /api/generate-email/`  
+`GET /api/health/`
 
-### Request body
+## Local Fallback AI Model
 
-```json
-{
-  "sender_name": "Alex",
-  "sender_role": "Account Manager",
-  "recipient_name": "Priya",
-  "recipient_role": "Head of Marketing",
-  "company": "Acme Inc.",
-  "purpose": "Follow up after product demo",
-  "key_points": "Thank them for the time; propose pilot timeline; share pricing options.",
-  "additional_context": "They requested rollout support details.",
-  "call_to_action": "Ask for a 30-minute pilot planning call next week.",
-  "tone": "Professional",
-  "length": "Medium",
-  "language": "English"
-}
+If `GROQ_API_KEY` is empty, the app uses the local fallback model from `emails/local_ai.py`.
+
+### Retrain fallback model from dataset
+
+1. **From local Kaggle CSV/JSONL**
+```bash
+cd backend
+python manage.py train_email_fallback_model --dataset-path /absolute/path/to/dataset.csv
 ```
 
-### Response body
-
-```json
-{
-  "subject": "Suggested email subject",
-  "body": "Generated email body"
-}
+2. **From public dataset URL**
+```bash
+cd backend
+python manage.py train_email_fallback_model --dataset-url "https://example.com/email_dataset.csv"
 ```
 
-## Deploy Backend on Render
+Supported dataset columns: `subject`, plus one of `body` / `email` / `message` / `text` (optional `tone`).
 
-1. Push repository to GitHub.
-2. In Render, create a new Blueprint and point it to this repo.
-3. Render picks up `render.yaml` automatically.
-4. Set:
-   - `DJANGO_ALLOWED_HOSTS=email-generator-backend-klgk.onrender.com,.onrender.com`
-   - `CORS_ALLOW_ALL_ORIGINS=True` (already set in `render.yaml`)
-   - (Optional) `GROQ_API_KEY`
-   - (Optional) `GROQ_MODEL`
-5. Deploy.
+Trained model is saved at:
+`backend/emails/model/local_email_model.json`
 
-Your backend URL will be similar to:
-`https://email-generator-backend.onrender.com`
+## Environment Variables
 
-## Deploy Frontend on Vercel
+Backend (`backend/.env`):
 
-1. Import the `frontend` directory as a Vercel project.
-2. Framework preset: **Vite**
-3. Set environment variable:
-   - `VITE_API_BASE_URL=https://your-render-backend.onrender.com`
-4. Deploy.
+- `DJANGO_SECRET_KEY=...`
+- `DJANGO_DEBUG=True|False`
+- `DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.onrender.com`
+- `CORS_ALLOW_ALL_ORIGINS=True`
+- `GROQ_API_KEY=` (optional)
+- `GROQ_MODEL=llama-3.1-8b-instant`
+- `LOCAL_FALLBACK_ON_PROVIDER_ERROR=True`
 
-## Notes
+Frontend (`frontend/.env`):
 
-- No OpenAI key is required.
-- If `GROQ_API_KEY` is present, Groq is used for generation.
-- If `GROQ_API_KEY` is empty, the app uses the built-in local generator.
+- `VITE_API_BASE_URL=http://127.0.0.1:8000` (local)
+- `VITE_API_BASE_URL=https://email-generator-backend-klgk.onrender.com` (production)
+
+## Deployment
+
+### Render (backend)
+
+- `render.yaml` already installs required libraries with `pip install -r requirements.txt`
+- Runs migrations on start: `python manage.py migrate`
+- Binds to Render port: `gunicorn ... --bind 0.0.0.0:${PORT:-10000}`
+
+### Vercel (frontend)
+
+- Root directory: `frontend`
+- Set `VITE_API_BASE_URL` to your Render backend URL
