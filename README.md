@@ -95,6 +95,7 @@ Frontend runs on `http://localhost:5173`.
 2. In Render, create a new Blueprint and point it to this repo.
 3. Render picks up `render.yaml` automatically.
 4. Set:
+   - `DJANGO_ALLOWED_HOSTS=email-generator-backend-klgk.onrender.com,.onrender.com`
    - `CORS_ALLOW_ALL_ORIGINS=True` (already set in `render.yaml`)
    - (Optional) `GROQ_API_KEY`
    - (Optional) `GROQ_MODEL`

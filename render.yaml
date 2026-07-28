@@ -5,12 +5,12 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: gunicorn email_generator.wsgi:application
+    startCommand: python manage.py migrate && gunicorn email_generator.wsgi:application --bind 0.0.0.0:${PORT:-10000}
     envVars:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "email-generator-backend.onrender.com"
+        value: "email-generator-backend-klgk.onrender.com,.onrender.com,localhost,127.0.0.1"
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "True"
       - key: DJANGO_SECRET_KEY
